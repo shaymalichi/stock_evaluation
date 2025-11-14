@@ -152,6 +152,7 @@ def main():
     print(f"🚀 [STEP 1] Searching for recent news articles for {ticker}...")
     articles = fetch_articles(ticker, news_api_key, num_results=15)
     if not articles:
+        print(f'no articles found for {ticker}')
         sys.exit(1)
 
     # --- Step 2: Analyze Sentiment ---
