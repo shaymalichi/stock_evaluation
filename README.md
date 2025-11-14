@@ -55,7 +55,7 @@ This tool fetches recent news articles for a given stock ticker and uses Google 
 
 Run the script from the project root, passing a stock ticker symbol as an argument:
 ```bash
-  python stock_eval.py TSLA
+  python main.py TSLA
 ```
 
 The script will:
