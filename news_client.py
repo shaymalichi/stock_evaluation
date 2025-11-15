@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
-
+import sys
 import requests
 from typing import List, Dict
 
-def fetch_articles(ticker: str, news_api_key: str, num_results: int = 15) -> List[Dict[str, str]]:
+def fetch_articles(ticker_symbol: str, news_api_key: str, num_results: int = 15) -> List[Dict[str, str]]:
     """
     Search for news articles about a stock ticker using NewsAPI and return filtered article data.
 
     Args:
-        ticker: Stock ticker symbol (e.g., 'AAPL', 'TSLA')
+        ticker_symbol: Stock ticker symbol (e.g., 'AAPL', 'TSLA')
         news_api_key: NewsAPI key
         num_results: Number of articles to retrieve (default: 15)
 
@@ -17,7 +17,7 @@ def fetch_articles(ticker: str, news_api_key: str, num_results: int = 15) -> Lis
     """
     url = "https://newsapi.org/v2/everything"
     params = {
-        'q': f"{ticker} stock",
+        'q': f"{ticker_symbol} stock",
         'apiKey': news_api_key,
         'language': 'en',
         'sortBy': 'publishedAt',
@@ -45,6 +45,10 @@ def fetch_articles(ticker: str, news_api_key: str, num_results: int = 15) -> Lis
                 'content': article.get('content', '')
             }
             filtered_articles.append(filtered_article)
+
+        if not articles:
+            print(f'no articles found for {ticker_symbol}')
+            sys.exit(1)
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching search results: {e}")

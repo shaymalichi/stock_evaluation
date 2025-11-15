@@ -2,6 +2,7 @@
 
 import os
 import json
+import sys
 from typing import List, Dict, Any
 import google.generativeai as genai
 
@@ -128,7 +129,14 @@ def analyze_sentiment(ticker: str, articles: List[Dict[str, str]], api_key: str)
         )
 
         json_text = response.text.strip().replace('```json', '').replace('```', '')
-        return json.loads(json_text)
+        analysis_data = json.loads(json_text)
+
+        if "error" in analysis_data:
+            print(f"🛑 Analysis Error: {analysis_data['error']}", file=sys.stderr)
+            print(f"Raw response: {analysis_data.get('raw_response', 'N/A')}", file=sys.stderr)
+            sys.exit(1)
+
+        return analysis_data
 
     except Exception as e:
         return {"error": f"Error during sentiment analysis: {str(e)}",

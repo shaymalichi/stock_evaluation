@@ -8,6 +8,11 @@ import config
 from news_client import fetch_articles
 from analysis_client import analyze_sentiment
 
+def parse_ticker_from_args() -> str:
+    if len(sys.argv) < 2:
+        print("Usage: python main.py <TICKER>", file=sys.stderr)
+        sys.exit(1)
+    return sys.argv[1].upper()
 
 def print_analysis_report(analysis_data: Dict[str, Any], ticker: str, num_articles: int):
     """
@@ -58,49 +63,25 @@ def print_analysis_report(analysis_data: Dict[str, Any], ticker: str, num_articl
 
 def main():
     """Main function to run the stock news finder and sentiment analyzer."""
-    start_time_total = time.time()
+    ticker_symbol = parse_ticker_from_args()
 
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <TICKER>", file=sys.stderr)
-        sys.exit(1)
-    ticker = sys.argv[1].upper()
-
-    # --- Step 0: Load Configuration ---
     news_api_key, gemini_api_key = config.load_and_validate_keys()
 
     # --- Step 1: Gather Data ---
-    print(f"🚀 [STEP 1] Searching for recent news articles for {ticker}...")
-    start_time_fetch = time.time()  # התחלת מדידה: שליפת כתבות
-    articles = fetch_articles(ticker, news_api_key, num_results=15)
-    end_time_fetch = time.time()  # סיום מדידה: שליפת כתבות
-
-    if not articles:
-        print(f'no articles found for {ticker}')
-        sys.exit(1)
-    print(f"✅ [STEP 1] Completed in {end_time_fetch - start_time_fetch:.2f} seconds.")
+    start_time_fetch = time.time()
+    articles = fetch_articles(ticker_symbol, news_api_key, num_results=15)
+    end_time_fetch = time.time()
+    print(f"fetch_articles: {end_time_fetch - start_time_fetch:.2f} seconds.")
 
     # --- Step 2: Analyze Sentiment ---
-    print(f"🧠 [STEP 2] Found {len(articles)} articles. Sending for structured sentiment analysis...")
     start_time_analysis = time.time()
-    analysis_data = analyze_sentiment(ticker, articles, gemini_api_key)
+    analysis_data = analyze_sentiment(ticker_symbol, articles, gemini_api_key)
     end_time_analysis = time.time()
-
-    if "error" in analysis_data:
-        print(f"🛑 Analysis Error: {analysis_data['error']}", file=sys.stderr)
-        print(f"Raw response: {analysis_data.get('raw_response', 'N/A')}", file=sys.stderr)
-        sys.exit(1)
-    print(f"✅ [STEP 2] Completed in {end_time_analysis - start_time_analysis:.2f} seconds.")
+    print(f"analyze_sentiment: {end_time_analysis - start_time_analysis:.2f} seconds.")
 
     # --- Step 3: Print Report ---
     print(f"📜 [STEP 3] Generating report...")
-    print_analysis_report(analysis_data, ticker, len(articles))
-
-    end_time_total = time.time()
-    total_duration = end_time_total - start_time_total
-
-    print("\n" + "=" * 90)
-    print(f"⏱️ TOTAL RUNTIME: {total_duration:.2f} seconds")
-    print("=" * 90)
+    print_analysis_report(analysis_data, ticker_symbol, len(articles))
 
 
 if __name__ == "__main__":
