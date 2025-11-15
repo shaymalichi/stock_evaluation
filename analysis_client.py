@@ -88,7 +88,8 @@ def analyze_articles_concurrently(
     the aggregated analysis data structure expected by print_analysis_report.
     """
     articles_for_threading = [{"content": text} for text in relevant_articles_text]
-    results = []
+    results: List[Dict[str, Any]] = []
+    errors: List[str] = []
 
     max_workers = len(articles_for_threading) or 1
 
@@ -109,14 +110,18 @@ def analyze_articles_concurrently(
                 if "news_items" in result:
                     results.extend(result["news_items"])
                 elif "error" in result:
+                    errors.append(result["error"])
                     print(f"⚠️ Thread error: {result['error']}", file=sys.stderr)
             except Exception as exc:
+                errors.append(str(exc))
                 print(f"A thread generated an exception: {exc}", file=sys.stderr)
 
     return {
         "ticker": ticker_symbol,
         "analysis_date": time.strftime("%Y-%m-%d"),
         "news_items": results,
+        "errors": errors,
+        "errors_count": len(errors),
     }
 
 
