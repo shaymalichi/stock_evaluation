@@ -4,8 +4,52 @@ import os
 import json
 import sys
 from typing import List, Dict, Any
+import faiss
 import google.generativeai as genai
+import numpy as np
+import config
 
+def embed_articles(articles: List[Dict[str, str]]):
+    genai.configure(api_key=config.GEMINI_API_KEY)
+    genai.GenerativeModel('models/text-embedding-004')
+    article_texts = [article['content'] for article in articles]
+
+    response = genai.embed_content(
+        model='models/text-embedding-004',
+        content=article_texts,
+        task_type="RETRIEVAL_DOCUMENT"
+    )
+    embeddings_list = response['embedding']
+    d = len(embeddings_list[0])
+    embeddings_np = np.array(embeddings_list).astype('float32')
+    index = faiss.IndexFlatL2(d)
+    index.add(embeddings_np) # type: ignore[arg-type]
+    return article_texts, index
+
+
+def search_relevant_articles(ticker_symbol: str, article_texts: list, index: faiss.Index) -> list:
+    """
+    Search for relevant articles based on a query about stock price and sentiment impact.
+
+    Args:
+        ticker_symbol: Stock ticker symbol
+        article_texts: List of article content texts
+        index: FAISS index containing article embeddings
+
+    Returns:
+        List of relevant article texts
+    """
+    search_query = f"Significant positive or negative news impacting {ticker_symbol} stock price and sentiment."
+    query_embedding_list = genai.embed_content(
+        model='models/text-embedding-004',
+        content=search_query,
+        task_type="RETRIEVAL_QUERY"
+    )['embedding']
+    query_embedding_np = np.array([query_embedding_list]).astype('float32')
+    k = 5
+    D, I = index.search(query_embedding_np, k)
+    relevant_indices = I[0]
+    return [article_texts[i] for i in relevant_indices]
 
 def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -> Dict[str, Any]:
     """
@@ -62,7 +106,7 @@ def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -
         return {"error": f"Error during sentiment analysis for article: {article.get('title', 'N/A')}: {str(e)}",
                 "raw_response": response.text if 'response' in locals() else 'N/A'}
 
-def analyze_sentiment(ticker: str, articles: List[Dict[str, str]], api_key: str) -> Dict[str, Any]:
+def analyze_sentiment(ticker: str, articles: List[str], api_key: str) -> Dict[str, Any]:
     """
     Analyzes news articles for sentiment using Gemini API and returns a structured JSON.
 
@@ -77,12 +121,7 @@ def analyze_sentiment(ticker: str, articles: List[Dict[str, str]], api_key: str)
     if not articles:
         return {"error": "No articles found for analysis."}
 
-    articles_raw_text = "\n\n---\n\n".join([
-        f"AUTHOR: {article['author']}\n"
-        f"TITLE: {article['title']}\n"
-        f"CONTENT: {article['content']}"
-        for article in articles
-    ])
+    articles_raw_text = "\n\n---\n\n".join(articles)
 
     # Configure Gemini API
     genai.configure(api_key=api_key)

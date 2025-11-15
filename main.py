@@ -3,10 +3,9 @@
 import sys
 from typing import Dict, Any
 import time
-
 import config
-from news_client import fetch_articles
-from analysis_client import analyze_sentiment
+from news_client import fetch_articles, NUM_OF_ARTICLES
+from analysis_client import analyze_sentiment, search_relevant_articles, embed_articles
 
 def parse_ticker_from_args() -> str:
     if len(sys.argv) < 2:
@@ -69,18 +68,22 @@ def main():
 
     # --- Step 1: Gather Data ---
     start_time_fetch = time.time()
-    articles = fetch_articles(ticker_symbol, news_api_key, num_results=15)
+    articles = fetch_articles(ticker_symbol, news_api_key, NUM_OF_ARTICLES)
     end_time_fetch = time.time()
-    print(f"fetch_articles: {end_time_fetch - start_time_fetch:.2f} seconds.")
+    print(f"fetch_articles: {end_time_fetch - start_time_fetch:.2f} seconds")
+
+    # --- Step 1.5: Process Data ---
+    article_texts, index = embed_articles(articles)
+    relevant_articles_text = search_relevant_articles(ticker_symbol, article_texts, index)
 
     # --- Step 2: Analyze Sentiment ---
     start_time_analysis = time.time()
-    analysis_data = analyze_sentiment(ticker_symbol, articles, gemini_api_key)
+    analysis_data = analyze_sentiment(ticker_symbol, relevant_articles_text, gemini_api_key)
     end_time_analysis = time.time()
-    print(f"analyze_sentiment: {end_time_analysis - start_time_analysis:.2f} seconds.")
+    print(f"analyze_sentiment: {end_time_analysis - start_time_analysis:.2f} seconds")
 
     # --- Step 3: Print Report ---
-    print(f"📜 [STEP 3] Generating report...")
+    print(f"\n Generating report...")
     print_analysis_report(analysis_data, ticker_symbol, len(articles))
 
 
