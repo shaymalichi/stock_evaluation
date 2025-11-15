@@ -39,9 +39,6 @@ def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[D
         articles = data.get('articles', [])
         filtered_articles = []
         for article in articles:
-            # Shrinking the context size to 200 characters
-            # original_content = article.get('content', '')
-            # truncated_content = original_content[:200] + '...' if len(original_content) > 200 else original_content
             filtered_article = {
                 'author': article.get('author', ''),
                 'title': article.get('title', ''),
