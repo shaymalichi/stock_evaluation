@@ -4,7 +4,7 @@ import sys
 from typing import Dict, Any, List
 import time
 import config
-from news_client import fetch_articles, NUM_OF_ARTICLES
+from news_client import fetch_articles
 from analysis_client import search_relevant_articles, embed_articles, analyze_single_article, synthesize_report
 
 def parse_ticker_from_args() -> str:
@@ -86,7 +86,7 @@ def main():
 
     # --- Step 1: Gather Data ---
     start_time_fetch = time.time()
-    articles = fetch_articles(ticker_symbol, news_api_key, NUM_OF_ARTICLES)
+    articles = fetch_articles(ticker_symbol, news_api_key, config.NUM_OF_ARTICLES)
     end_time_fetch = time.time()
     print(f"fetch_articles: {end_time_fetch - start_time_fetch:.2f} seconds")
 

@@ -6,7 +6,6 @@ import faiss
 import google.generativeai as genai
 import numpy as np
 import config
-from news_client import NUM_OF_ARTICLES_FOR_ANALYSIS
 
 # For articles summaries
 ANALYSIS_SCHEMA = {
@@ -71,7 +70,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
         task_type="RETRIEVAL_QUERY"
     )['embedding']
     query_embedding_np = np.array([query_embedding_list]).astype('float32')
-    k = NUM_OF_ARTICLES_FOR_ANALYSIS
+    k = config.NUM_OF_ARTICLES_FOR_ANALYSIS
     D, I = index.search(query_embedding_np, k)
     relevant_indices = I[0]
     return [article_texts[i] for i in relevant_indices]

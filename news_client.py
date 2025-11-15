@@ -3,9 +3,6 @@ import sys
 import requests
 from typing import List, Dict
 
-NUM_OF_ARTICLES = 50
-NUM_OF_ARTICLES_FOR_ANALYSIS = 5
-
 def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:
     """
     Search for news articles about a stock ticker using NewsAPI and return filtered article data.
