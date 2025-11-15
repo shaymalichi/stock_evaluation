@@ -1,13 +1,26 @@
 #!/usr/bin/env python3
 
-import os
 import json
-import sys
 from typing import List, Dict, Any
 import faiss
 import google.generativeai as genai
 import numpy as np
 import config
+from news_client import NUM_OF_ARTICLES_FOR_ANALYSIS
+
+ANALYSIS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "headline": {"type": "string", "description": "The original headline of the article."},
+        "sentiment_score": {"type": "integer",
+                            "description": "A score from 1 (Extremely Negative) to 10 (Extremely Positive)."},
+        "sentiment_category": {"type": "string", "description": "One of: POSITIVE, NEGATIVE, NEUTRAL."},
+        "impact_reason": {"type": "string",
+                          "description": "A short summary (max 15 words) explaining the article and its impact."}
+    },
+    "required": ["headline", "sentiment_score", "sentiment_category", "impact_reason"]
+}
+
 
 def embed_articles(articles: List[Dict[str, str]]):
     genai.configure(api_key=config.GEMINI_API_KEY)
@@ -46,7 +59,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
         task_type="RETRIEVAL_QUERY"
     )['embedding']
     query_embedding_np = np.array([query_embedding_list]).astype('float32')
-    k = 5
+    k = NUM_OF_ARTICLES_FOR_ANALYSIS
     D, I = index.search(query_embedding_np, k)
     relevant_indices = I[0]
     return [article_texts[i] for i in relevant_indices]
@@ -71,26 +84,17 @@ def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -
     1. **ONLY RETURN VALID JSON.** Do not include any other text, greetings, or explanations.
     2. **Sentiment Score:** A number from 1 (Extremely Negative) to 10 (Extremely Positive).
     3. **Impact Reason (Summary):** A short summary (max 20 words) explaining the article and why it received that score.
-    4. **Headline:** Use the original headline.
 
     **DATA FOR ANALYSIS:**
     {article_raw_text}
-
-    **REQUIRED JSON OUTPUT FORMAT:**
-    ```json
-    {{
-      "headline": "{article.get('title', 'N/A')}",
-      "sentiment_score": 0,
-      "sentiment_category": "POSITIVE/NEGATIVE/NEUTRAL",
-      "impact_reason": "..."
-    }}
-    ```
     """
 
     try:
         generation_config = {
             "max_output_tokens": 1024,
             "temperature": 0.0,
+            "response_mime_type": "application/json",
+            "response_schema": ANALYSIS_SCHEMA
         }
 
         response = model.generate_content(
@@ -106,77 +110,3 @@ def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -
         return {"error": f"Error during sentiment analysis for article: {article.get('title', 'N/A')}: {str(e)}",
                 "raw_response": response.text if 'response' in locals() else 'N/A'}
 
-def analyze_sentiment(ticker: str, articles: List[str], api_key: str) -> Dict[str, Any]:
-    """
-    Analyzes news articles for sentiment using Gemini API and returns a structured JSON.
-
-    Args:
-        ticker: Stock ticker symbol
-        articles: List of article dictionaries
-        api_key: Google Gemini API key
-
-    Returns:
-        Dictionary containing the full structured analysis or an error message.
-    """
-    if not articles:
-        return {"error": "No articles found for analysis."}
-
-    articles_raw_text = "\n\n---\n\n".join(articles)
-
-    # Configure Gemini API
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel('gemini-2.5-flash')
-
-    prompt = f"""
-    You are a professional Senior Capital Market Analyst. Your mission is to analyze the following news snippets concerning the company {ticker} and provide a detailed, structured sentiment analysis. You must analyze each article individually.
-
-    **STRICT INSTRUCTIONS:**
-    1. **ONLY RETURN VALID JSON.** Do not include any other text, greetings, or explanations outside the JSON structure.
-    2. **Sentiment Score:** A number from 1 (Extremely Negative, High Risk) to 10 (Extremely Positive, High Opportunity).
-    3. **Impact Reason:** A short explanation (max 15 words) on the potential impact on the stock price.
-
-    **DATA FOR ANALYSIS:**
-    {articles_raw_text}
-
-    **REQUIRED JSON OUTPUT FORMAT:**
-    ```json
-    {{
-      "ticker": "{ticker}",
-      "analysis_date": "{os.popen('date +%Y-%m-%d').read().strip()}",
-      "news_items": [
-        {{
-          "headline": "...",
-          "sentiment_score": 0,
-          "sentiment_category": "POSITIVE/NEGATIVE/NEUTRAL",
-          "impact_reason": "..."
-        }}
-        // ... include an object for every article provided above
-      ]
-    }}
-    ```
-    """
-
-    try:
-        generation_config = {
-            "max_output_tokens": 4096,
-            "temperature": 0.0,  # Low temperature forces deterministic, structured output
-        }
-
-        response = model.generate_content(
-            prompt,
-            generation_config=generation_config
-        )
-
-        json_text = response.text.strip().replace('```json', '').replace('```', '')
-        analysis_data = json.loads(json_text)
-
-        if "error" in analysis_data:
-            print(f"🛑 Analysis Error: {analysis_data['error']}", file=sys.stderr)
-            print(f"Raw response: {analysis_data.get('raw_response', 'N/A')}", file=sys.stderr)
-            sys.exit(1)
-
-        return analysis_data
-
-    except Exception as e:
-        return {"error": f"Error during sentiment analysis: {str(e)}",
-                "raw_response": response.text if 'response' in locals() else 'N/A'}

@@ -4,6 +4,7 @@ import requests
 from typing import List, Dict
 
 NUM_OF_ARTICLES = 50
+NUM_OF_ARTICLES_FOR_ANALYSIS = 5
 
 def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:
     """

@@ -1,17 +1,59 @@
 #!/usr/bin/env python3
-
+import concurrent
 import sys
-from typing import Dict, Any
+from typing import Dict, Any, List
 import time
 import config
 from news_client import fetch_articles, NUM_OF_ARTICLES
-from analysis_client import analyze_sentiment, search_relevant_articles, embed_articles
+from analysis_client import search_relevant_articles, embed_articles, analyze_single_article
 
 def parse_ticker_from_args() -> str:
     if len(sys.argv) < 2:
         print("Usage: python main.py <TICKER>", file=sys.stderr)
         sys.exit(1)
     return sys.argv[1].upper()
+
+def analyze_articles_concurrently(
+    ticker_symbol: str,
+    relevant_articles_text: List[str],
+    gemini_api_key: str,
+) -> Dict[str, Any]:
+    """
+    Run sentiment analysis for multiple articles concurrently and return
+    the aggregated analysis data structure expected by print_analysis_report.
+    """
+    articles_for_threading = [{"content": text} for text in relevant_articles_text]
+    results = []
+
+    max_workers = len(articles_for_threading) or 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_article = {
+            executor.submit(
+                analyze_single_article,
+                ticker_symbol,
+                article,
+                gemini_api_key,
+            ): article
+            for article in articles_for_threading
+        }
+
+        for future in concurrent.futures.as_completed(future_to_article):
+            try:
+                result = future.result()
+                if "news_items" in result:
+                    results.extend(result["news_items"])
+                elif "error" in result:
+                    print(f"⚠️ Thread error: {result['error']}", file=sys.stderr)
+            except Exception as exc:
+                print(f"A thread generated an exception: {exc}", file=sys.stderr)
+
+    return {
+        "ticker": ticker_symbol,
+        "analysis_date": time.strftime("%Y-%m-%d"),
+        "news_items": results,
+    }
+
 
 def print_analysis_report(analysis_data: Dict[str, Any], ticker: str, num_articles: int):
     """
@@ -76,16 +118,16 @@ def main():
     article_texts, index = embed_articles(articles)
     relevant_articles_text = search_relevant_articles(ticker_symbol, article_texts, index)
 
-    # --- Step 2: Analyze Sentiment ---
-    start_time_analysis = time.time()
-    analysis_data = analyze_sentiment(ticker_symbol, relevant_articles_text, gemini_api_key)
-    end_time_analysis = time.time()
-    print(f"analyze_sentiment: {end_time_analysis - start_time_analysis:.2f} seconds")
+    # --- Step 2: Analyze Sentiment (concurrently) ---
+    analysis_data = analyze_articles_concurrently(
+        ticker_symbol,
+        relevant_articles_text,
+        gemini_api_key,
+    )
 
     # --- Step 3: Print Report ---
     print(f"\n Generating report...")
     print_analysis_report(analysis_data, ticker_symbol, len(articles))
-
 
 if __name__ == "__main__":
     main()
