@@ -8,8 +8,13 @@ load_dotenv()
 
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-ARTICLES_TO_FETCH = os.getenv('ARTICLES_TO_FETCH')
-ARTICLES_TO_INFERENCE = os.getenv('ARTICLES_TO_INFERENCE')
+
+try:
+    ARTICLES_TO_FETCH = int(os.getenv('ARTICLES_TO_FETCH', 50))
+    ARTICLES_TO_INFERENCE = int(os.getenv('ARTICLES_TO_INFERENCE', 5))
+except ValueError:
+    print("🛑 Error: ARTICLES_TO_FETCH or ARTICLES_TO_INFERENCE must be integers in .env.", file=sys.stderr)
+    sys.exit(1)
 
 def load_and_validate_keys():
     """

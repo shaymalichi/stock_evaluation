@@ -73,7 +73,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
         task_type="RETRIEVAL_QUERY"
     )['embedding']
     query_embedding_np = np.array([query_embedding_list]).astype('float32')
-    k = int(config.ARTICLES_TO_INFERENCE)
+    k = config.ARTICLES_TO_INFERENCE
     D, I = index.search(query_embedding_np, k)
     relevant_indices = I[0]
     return [article_texts[i] for i in relevant_indices]

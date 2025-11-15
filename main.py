@@ -44,7 +44,7 @@ def main():
 
     # --- Step 1: Gather Data ---
     start_time_fetch = time.time()
-    articles = fetch_articles(ticker_symbol, news_api_key, int(config.ARTICLES_TO_FETCH))
+    articles = fetch_articles(ticker_symbol, news_api_key, config.ARTICLES_TO_FETCH)
     end_time_fetch = time.time()
     print(f"fetch_articles: {end_time_fetch - start_time_fetch:.2f} seconds")
 

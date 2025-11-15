@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import sys
+
 import requests
 from typing import List, Dict
 
@@ -36,19 +36,17 @@ def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[D
         articles = data.get('articles', [])
         filtered_articles = []
         for article in articles:
-            filtered_article = {
-                'author': article.get('author', ''),
-                'title': article.get('title', ''),
-                'content': article.get('content', '')
-            }
-            filtered_articles.append(filtered_article)
+            # We filter only articles that have non-empty content for embedding
+            if article.get('content') and article.get('title'):
+                filtered_article = {
+                    'author': article.get('author', ''),
+                    'title': article.get('title', ''),
+                    'content': article.get('content', '')
+                }
+                filtered_articles.append(filtered_article)
 
-        if not articles:
-            print(f'no articles found for {ticker_symbol}')
-            sys.exit(1)
+        return filtered_articles
 
     except requests.exceptions.RequestException as e:
         print(f"Error fetching search results: {e}")
         return []
-
-    return filtered_articles[:num_results]
