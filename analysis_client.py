@@ -54,7 +54,7 @@ def embed_articles(articles: List[Dict[str, str]]):
     return article_texts, index
 
 
-def search_relevant_articles(ticker_symbol: str, article_texts: list, index: faiss.Index) -> list:
+def search_relevant_articles(ticker_symbol: str, article_texts: list, index: faiss.Index, articles_for_inference) -> list:
     """
     Search for relevant articles based on a query about stock price and sentiment impact.
 
@@ -62,6 +62,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
         ticker_symbol: Stock ticker symbol
         article_texts: List of article content texts
         index: FAISS index containing article embeddings
+        articles_for_inference: Number of articles to filter
 
     Returns:
         List of relevant article texts
@@ -73,8 +74,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
         task_type="RETRIEVAL_QUERY"
     )['embedding']
     query_embedding_np = np.array([query_embedding_list]).astype('float32')
-    k = config.ARTICLES_TO_INFERENCE
-    D, I = index.search(query_embedding_np, k)
+    D, I = index.search(query_embedding_np, articles_for_inference)
     relevant_indices = I[0]
     return [article_texts[i] for i in relevant_indices]
 
