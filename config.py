@@ -8,8 +8,8 @@ load_dotenv()
 
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-NUM_OF_ARTICLES = os.getenv('NUM_OF_ARTICLES')
-NUM_OF_ARTICLES_FOR_ANALYSIS = os.getenv('NUM_OF_ARTICLES_FOR_ANALYSIS')
+ARTICLES_TO_FETCH = os.getenv('ARTICLES_TO_FETCH')
+ARTICLES_TO_INFERENCE = os.getenv('ARTICLES_TO_INFERENCE')
 
 def load_and_validate_keys():
     """

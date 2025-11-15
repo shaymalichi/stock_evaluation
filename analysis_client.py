@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 
+import concurrent
 import json
+import sys
+import time
 from typing import List, Dict, Any
 import faiss
 import google.generativeai as genai
@@ -70,10 +73,52 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
         task_type="RETRIEVAL_QUERY"
     )['embedding']
     query_embedding_np = np.array([query_embedding_list]).astype('float32')
-    k = config.NUM_OF_ARTICLES_FOR_ANALYSIS
+    k = config.ARTICLES_TO_INFERENCE
     D, I = index.search(query_embedding_np, k)
     relevant_indices = I[0]
     return [article_texts[i] for i in relevant_indices]
+
+def analyze_articles_concurrently(
+    ticker_symbol: str,
+    relevant_articles_text: List[str],
+    gemini_api_key: str,
+) -> Dict[str, Any]:
+    """
+    Run sentiment analysis for multiple articles concurrently and return
+    the aggregated analysis data structure expected by print_analysis_report.
+    """
+    articles_for_threading = [{"content": text} for text in relevant_articles_text]
+    results = []
+
+    max_workers = len(articles_for_threading) or 1
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+        future_to_article = {
+            executor.submit(
+                analyze_single_article,
+                ticker_symbol,
+                article,
+                gemini_api_key,
+            ): article
+            for article in articles_for_threading
+        }
+
+        for future in concurrent.futures.as_completed(future_to_article):
+            try:
+                result = future.result()
+                if "news_items" in result:
+                    results.extend(result["news_items"])
+                elif "error" in result:
+                    print(f"⚠️ Thread error: {result['error']}", file=sys.stderr)
+            except Exception as exc:
+                print(f"A thread generated an exception: {exc}", file=sys.stderr)
+
+    return {
+        "ticker": ticker_symbol,
+        "analysis_date": time.strftime("%Y-%m-%d"),
+        "news_items": results,
+    }
+
 
 def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -> Dict[str, Any]:
     """

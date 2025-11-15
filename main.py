@@ -1,59 +1,17 @@
 #!/usr/bin/env python3
-import concurrent
+
 import sys
-from typing import Dict, Any, List
+from typing import Dict, Any
 import time
 import config
 from news_client import fetch_articles
-from analysis_client import search_relevant_articles, embed_articles, analyze_single_article, synthesize_report
+from analysis_client import search_relevant_articles, embed_articles, synthesize_report, analyze_articles_concurrently
 
 def parse_ticker_from_args() -> str:
     if len(sys.argv) < 2:
         print("Usage: python main.py <TICKER>", file=sys.stderr)
         sys.exit(1)
     return sys.argv[1].upper()
-
-def analyze_articles_concurrently(
-    ticker_symbol: str,
-    relevant_articles_text: List[str],
-    gemini_api_key: str,
-) -> Dict[str, Any]:
-    """
-    Run sentiment analysis for multiple articles concurrently and return
-    the aggregated analysis data structure expected by print_analysis_report.
-    """
-    articles_for_threading = [{"content": text} for text in relevant_articles_text]
-    results = []
-
-    max_workers = len(articles_for_threading) or 1
-
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_article = {
-            executor.submit(
-                analyze_single_article,
-                ticker_symbol,
-                article,
-                gemini_api_key,
-            ): article
-            for article in articles_for_threading
-        }
-
-        for future in concurrent.futures.as_completed(future_to_article):
-            try:
-                result = future.result()
-                if "news_items" in result:
-                    results.extend(result["news_items"])
-                elif "error" in result:
-                    print(f"⚠️ Thread error: {result['error']}", file=sys.stderr)
-            except Exception as exc:
-                print(f"A thread generated an exception: {exc}", file=sys.stderr)
-
-    return {
-        "ticker": ticker_symbol,
-        "analysis_date": time.strftime("%Y-%m-%d"),
-        "news_items": results,
-    }
-
 
 def print_final_recommendation(recommendation_data: Dict[str, Any], ticker: str):
     """
@@ -86,7 +44,7 @@ def main():
 
     # --- Step 1: Gather Data ---
     start_time_fetch = time.time()
-    articles = fetch_articles(ticker_symbol, news_api_key, config.NUM_OF_ARTICLES)
+    articles = fetch_articles(ticker_symbol, news_api_key, config.ARTICLES_TO_FETCH)
     end_time_fetch = time.time()
     print(f"fetch_articles: {end_time_fetch - start_time_fetch:.2f} seconds")
 
