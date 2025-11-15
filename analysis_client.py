@@ -8,6 +8,7 @@ import numpy as np
 import config
 from news_client import NUM_OF_ARTICLES_FOR_ANALYSIS
 
+# For articles summaries
 ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {
@@ -21,6 +22,17 @@ ANALYSIS_SCHEMA = {
     "required": ["headline", "sentiment_score", "sentiment_category", "impact_reason"]
 }
 
+# For inference
+REPORT_SCHEMA = {
+        "type": "object",
+        "properties": {
+            "overall_summary": {"type": "string"},
+            "final_sentiment": {"type": "string", "enum": ["Bullish", "Neutral", "Bearish"]},
+            "recommendation": {"type": "string", "enum": ["BUY", "HOLD", "SELL"]},
+            "major_risks": {"type": "array", "items": {"type": "string"}},
+        },
+        "required": ["overall_summary", "final_sentiment", "recommendation"]
+    }
 
 def embed_articles(articles: List[Dict[str, str]]):
     genai.configure(api_key=config.GEMINI_API_KEY)
@@ -110,3 +122,34 @@ def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -
         return {"error": f"Error during sentiment analysis for article: {article.get('title', 'N/A')}: {str(e)}",
                 "raw_response": response.text if 'response' in locals() else 'N/A'}
 
+
+def synthesize_report(ticker: str, analyzed_news_items: List[Dict[str, Any]], api_key: str) -> Dict[str, str]:
+    context_text = "Analysis Results from Individual Articles:\n"
+    for item in analyzed_news_items:
+        context_text += f"- Score {item['sentiment_score']}/10 ({item['sentiment_category']}): {item['impact_reason']} (Source: {item['headline']})\n"
+
+    genai.configure(api_key=api_key)
+    model = genai.GenerativeModel('gemini-2.5-flash')
+
+    prompt = f"""
+    You are the Chief Investment Strategist. Your task is to synthesize the following discrete sentiment analysis results for the stock {ticker} and provide a final, actionable recommendation.
+
+    **DATA SYNTHESIS:**
+    {context_text}
+
+    **FINAL OUTPUT MUST BE A JSON object with the following structure:**
+    1. **overall_summary**: A 2-3 sentence summary of the key findings.
+    2. **final_sentiment**: The consolidated sentiment (Bullish, Neutral, Bearish).
+    3. **recommendation**: The final action (BUY, HOLD, SELL).
+    4. **major_risks**: A list of 2 key risks mentioned in the analysis.
+
+    """
+
+    generation_config = {
+        "temperature": 0.0,
+        "response_mime_type": "application/json",
+        "response_schema": REPORT_SCHEMA
+    }
+
+    response = model.generate_content(prompt, generation_config=generation_config)
+    return json.loads(response.text)

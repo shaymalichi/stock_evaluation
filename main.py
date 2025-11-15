@@ -5,7 +5,7 @@ from typing import Dict, Any, List
 import time
 import config
 from news_client import fetch_articles, NUM_OF_ARTICLES
-from analysis_client import search_relevant_articles, embed_articles, analyze_single_article
+from analysis_client import search_relevant_articles, embed_articles, analyze_single_article, synthesize_report
 
 def parse_ticker_from_args() -> str:
     if len(sys.argv) < 2:
@@ -55,52 +55,28 @@ def analyze_articles_concurrently(
     }
 
 
-def print_analysis_report(analysis_data: Dict[str, Any], ticker: str, num_articles: int):
+def print_final_recommendation(recommendation_data: Dict[str, Any], ticker: str):
     """
-    Calculates statistics from the analysis data and prints a formatted report.
+    Prints the final synthesized recommendation and summary from the AI.
     """
-    news_items = analysis_data.get('news_items', [])
-    if not news_items:
-        print("🛑 The analysis did not return any news items for processing.", file=sys.stderr)
-        sys.exit(1)
+    print("\n" + "💰" * 15 + " FINAL INVESTMENT REPORT " + "💰" * 15)
+    print(f"📈 Ticker: {ticker}")
+    print(f"🎯 **Consolidated Sentiment:** {recommendation_data.get('final_sentiment', 'N/A')}")
+    print(f"⭐ **Actionable Recommendation:** {recommendation_data.get('recommendation', 'N/A')}")
+    print("-" * 65)
 
-    # Calculate the average score (The Fear/Greed Index)
-    total_score = sum(item.get('sentiment_score', 0) for item in news_items)
-    average_score = total_score / len(news_items)
+    print("\n📝 **Overall Summary:**")
+    print(f"  {recommendation_data.get('overall_summary', 'No summary provided.')}")
 
-    # Find the most positive and most negative news
-    best_news = max(news_items, key=lambda x: x.get('sentiment_score', 0))
-    worst_news = min(news_items, key=lambda x: x.get('sentiment_score', 0))
-
-    # Determine overall sentiment category
-    if average_score >= 7.0:
-        overall_sentiment = "Strong Bullish (High Greed)"
-    elif 6.0 <= average_score < 7.0:
-        overall_sentiment = "Neutral/Mixed (Uncertainty)"
+    print("\n⚠️ **Major Risks/Opportunities:**")
+    risks = recommendation_data.get('major_risks', [])
+    if risks:
+        for i, risk in enumerate(risks, 1):
+            print(f"  {i}. {risk}")
     else:
-        overall_sentiment = "Bearish (High Fear)"
+        print("  N/A")
 
-    print("\n" + "=" * 90)
-    print(f"📊 FINAL SENTIMENT INDEX FOR {ticker} (Based on {num_articles} Articles)")
-    print("=" * 90)
-
-    print(f"Overall Average Score: {average_score:.2f} / 10.00")
-    print(f"Overall Sentiment:     {overall_sentiment}")
-    print("\n")
-
-    # Highlight Key Findings
-    print("⭐ Most Positive News:")
-    print(f"  Score: {best_news['sentiment_score']}/10. | Category: {best_news['sentiment_category']}")
-    print(f"  Headline: {best_news['headline']}")
-    print(f"  Reason: {best_news['impact_reason']}")
-
-    print("\n🔻 Most Negative News:")
-    print(f"  Score: {worst_news['sentiment_score']}/10. | Category: {worst_news['sentiment_category']}")
-    print(f"  Headline: {worst_news['headline']}")
-    print(f"  Reason: {worst_news['impact_reason']}")
-
-    print("\n" + "=" * 90)
-
+    print("\n" + "💰" * 53 + "\n")
 
 def main():
     """Main function to run the stock news finder and sentiment analyzer."""
@@ -118,16 +94,22 @@ def main():
     article_texts, index = embed_articles(articles)
     relevant_articles_text = search_relevant_articles(ticker_symbol, article_texts, index)
 
-    # --- Step 2: Analyze Sentiment (concurrently) ---
     analysis_data = analyze_articles_concurrently(
         ticker_symbol,
         relevant_articles_text,
         gemini_api_key,
     )
 
+    # --- Step 2: Inference ---
+    final_recommendation_data = synthesize_report(
+        ticker_symbol,
+        analysis_data['news_items'],
+        gemini_api_key
+    )
+
     # --- Step 3: Print Report ---
     print(f"\n Generating report...")
-    print_analysis_report(analysis_data, ticker_symbol, len(articles))
+    print_final_recommendation(final_recommendation_data, ticker_symbol)
 
 if __name__ == "__main__":
     main()
