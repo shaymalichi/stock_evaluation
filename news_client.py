@@ -7,6 +7,8 @@ import time
 import requests
 from typing import List, Dict
 
+from tenacity import stop_after_attempt, retry, wait_fixed
+
 from interfaces import INewsProvider
 
 
@@ -65,6 +67,29 @@ class CachedNewsProvider(INewsProvider):
                 json.dump(data, f, indent=4)
         except Exception as e:
             print(f"⚠️ Cache save failed: {e}")
+
+class AutoRetryProvider(INewsProvider):
+    """
+    Retry decorator for INewsProvider.
+    """
+
+    def __init__(self, inner_provider: INewsProvider, max_retries: int = 3, wait_seconds: int = 2):
+        self.inner_provider = inner_provider
+        self.max_retries = max_retries
+        self.wait_seconds = wait_seconds
+
+    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+        print(f"🛡️ entering retry protection zone for {ticker}...")
+
+        @retry(stop=stop_after_attempt(self.max_retries), wait=wait_fixed(self.wait_seconds))
+        def _safe_fetch():
+            return self.inner_provider.fetch_articles(ticker, count)
+
+        try:
+            return _safe_fetch()
+        except Exception as e:
+            print(f"💀 All retry attempts failed: {e}")
+            return []
 
 
 def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:

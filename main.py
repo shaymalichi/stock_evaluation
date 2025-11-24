@@ -1,7 +1,7 @@
 import sys
 from typing import Dict, Any
 import config
-from news_client import NewsAPIClient, CachedNewsProvider
+from news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
 from analysis_client import GeminiAnalyzer
 from pipeline import StockAnalysisPipeline
 from stats_collector import StatsCollector
@@ -32,8 +32,9 @@ if __name__ == "__main__":
     fetch_count = int(config.ARTICLES_TO_FETCH)
     inference_count = int(config.ARTICLES_TO_INFERENCE)
 
-    my_news_client = NewsAPIClient(api_key=news_key)
-    cached_news_client = CachedNewsProvider(my_news_client, cache_dir=config.CACHE_DIR, ttl_seconds=config.CACHE_TTL_SECONDS)
+    base_provider = NewsAPIClient(api_key=news_key)
+    retry_provider = AutoRetryProvider(inner_provider=base_provider, max_retries=3)
+    final_news_provider = CachedNewsProvider(retry_provider, cache_dir=config.CACHE_DIR, ttl_seconds=config.CACHE_TTL_SECONDS)
     my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
     stats_collector = StatsCollector()
 
@@ -44,7 +45,7 @@ if __name__ == "__main__":
     )
 
     pipeline = StockAnalysisPipeline(
-        news_provider=cached_news_client,
+        news_provider=final_news_provider,
         analyzer=my_gemini_client,
         stats=stats_collector
     )
