@@ -2,3 +2,4 @@
 __pycache__/
 .idea/
 /run_stats.csv
+news_cache
