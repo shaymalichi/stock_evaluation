@@ -3,6 +3,16 @@
 import requests
 from typing import List, Dict
 
+from interfaces import INewsProvider
+
+
+class NewsAPIClient(INewsProvider):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+        return fetch_articles(ticker, self.api_key, count)
+
 def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:
     """
     Search for news articles about a stock ticker using NewsAPI and return filtered article data.

@@ -9,6 +9,23 @@ import faiss
 import google.generativeai as genai
 import numpy as np
 import config
+from interfaces import IStockAnalyzer
+
+
+class GeminiAnalyzer(IStockAnalyzer):
+    def __init__(self, api_key: str):
+        self.api_key = api_key
+
+    def filter_relevant(self, ticker: str, articles: List[Dict], count: int) -> List[str]:
+        article_texts, index = embed_articles(articles)
+        relevant_texts = search_relevant_articles(ticker, article_texts, index, count)
+        return relevant_texts
+
+    def analyze(self, ticker: str, articles: List[str]) -> Dict[str, Any]:
+        return analyze_articles_concurrently(ticker, articles, self.api_key)
+
+    def synthesize(self, ticker: str, analysis_results: List[Dict]) -> Dict[str, Any]:
+        return synthesize_report(ticker, analysis_results, self.api_key)
 
 # For articles summaries
 ANALYSIS_SCHEMA = {
