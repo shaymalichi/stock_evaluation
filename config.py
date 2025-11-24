@@ -8,6 +8,8 @@ load_dotenv()
 
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+CACHE_DIR = os.getenv('CACHE_DIR')
+CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', 3600))
 
 try:
     ARTICLES_TO_FETCH = int(os.getenv('ARTICLES_TO_FETCH', 50))

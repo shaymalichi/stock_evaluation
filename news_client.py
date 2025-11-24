@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+import json
+import os
+import time
+
 import requests
 from typing import List, Dict
 
@@ -12,6 +16,56 @@ class NewsAPIClient(INewsProvider):
 
     def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
         return fetch_articles(ticker, self.api_key, count)
+
+
+class CachedNewsProvider(INewsProvider):
+    """
+    A caching wrapper for INewsProvider that persists results to local JSON files.
+    """
+
+    def __init__(self, inner_provider: INewsProvider, cache_dir: str = "news_cache", ttl_seconds: int = 3600):
+        self.inner_provider = inner_provider
+        self.cache_dir = cache_dir
+        self.ttl_seconds = ttl_seconds
+
+        if not os.path.exists(self.cache_dir):
+            os.makedirs(self.cache_dir)
+
+    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+        cache_file = os.path.join(self.cache_dir, f"{ticker}_news.json")
+
+        if self._is_cache_valid(cache_file):
+            print(f"📦 Loading {ticker} news from local cache...")
+            return self._load_from_cache(cache_file)
+
+        print(f"🌐 Missed cache. Asking inner provider for {ticker}...")
+        articles = self.inner_provider.fetch_articles(ticker, count)
+
+        if articles:
+            self._save_to_cache(cache_file, articles)
+
+        return articles
+
+    def _is_cache_valid(self, filepath: str) -> bool:
+        if not os.path.exists(filepath):
+            return False
+        file_age = time.time() - os.path.getmtime(filepath)
+        return file_age < self.ttl_seconds
+
+    def _load_from_cache(self, filepath: str) -> List[Dict]:
+        try:
+            with open(filepath, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except:
+            return []
+
+    def _save_to_cache(self, filepath: str, data: List[Dict]):
+        try:
+            with open(filepath, 'w', encoding='utf-8') as f:
+                json.dump(data, f, indent=4)
+        except Exception as e:
+            print(f"⚠️ Cache save failed: {e}")
+
 
 def fetch_articles(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:
     """
