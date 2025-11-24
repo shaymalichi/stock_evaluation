@@ -49,7 +49,7 @@ if __name__ == "__main__":
     )
 
     try:
-        final_report = pipeline.run(ticker, fetch_count=50, inference_count=5)
+        final_report = pipeline.run(ticker, fetch_count, inference_count)
         print_final_recommendation(final_report, ticker)
         stats_collector.finalize(status='OK')
     except Exception as e:
