@@ -1,7 +1,9 @@
+import logging
 import time
 from src.utils.stats_collector import StatsCollector
 from src.core.interfaces import INewsProvider, IStockAnalyzer
 
+logger = logging.getLogger(__name__)
 
 class StockAnalysisPipeline:
     def __init__(self, news_provider: INewsProvider, analyzer: IStockAnalyzer, stats: StatsCollector):
@@ -10,8 +12,9 @@ class StockAnalysisPipeline:
         self.stats = stats
 
     def run(self, ticker: str, fetch_count: int, inference_count: int):
+        logger.info(f"🔄 Pipeline started for {ticker}")  # שימוש במקום print
 
-        print(f" 1. Fetching {fetch_count} articles...")
+        logger.debug(f"Step 1: Fetching {fetch_count} articles...")
         start_time_fetch = time.time()
 
         articles = self.news_provider.fetch_articles(ticker, fetch_count)
@@ -26,7 +29,10 @@ class StockAnalysisPipeline:
         self.stats.update('news_fetch_status', 'OK' if articles else 'NO_ARTICLES')
 
         if not articles:
+            logger.warning(f"⚠️ No articles found for {ticker}")
             raise Exception("No articles found")
+
+        logger.info(f"✅ Fetched {len(articles)} articles.")
 
         print(f"✅ Fetched {len(articles)} articles in {fetch_duration:.2f}s.")
 

@@ -1,3 +1,4 @@
+import logging
 import os
 import sys
 from typing import Dict, Any
@@ -6,8 +7,10 @@ from src.core.config import settings
 from src.providers.news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
 from src.providers.analysis_client import GeminiAnalyzer
 from src.core.pipeline import StockAnalysisPipeline
+from src.core.logger import setup_logging
 from src.utils.stats_collector import StatsCollector
 
+logger = logging.getLogger("MAIN")
 
 def print_final_recommendation(recommendation_data: Dict[str, Any], ticker: str):
     print("\n" + "💰" * 15 + " FINAL INVESTMENT REPORT " + "💰" * 15)
@@ -23,11 +26,14 @@ def print_final_recommendation(recommendation_data: Dict[str, Any], ticker: str)
 
 
 if __name__ == "__main__":
+    setup_logging()
+
     if len(sys.argv) < 2:
-        print("Usage: python main.py <TICKER>")
+        logger.error("Usage: python main.py <TICKER>")
         sys.exit(1)
 
     ticker = sys.argv[1].upper()
+    logger.info(f"🚀 Starting analysis for ticker: {ticker}")
 
     news_key = settings.NEWS_API_KEY.get_secret_value()
     gemini_key = settings.GEMINI_API_KEY.get_secret_value()
@@ -59,8 +65,10 @@ if __name__ == "__main__":
     try:
         final_report = pipeline.run(ticker, fetch_count, inference_count)
         print_final_recommendation(final_report, ticker)
+        logger.info("✅ Analysis completed successfully.")
         stats_collector.finalize(status='OK')
     except Exception as e:
         print(f"🛑 Error: {e}")
+        logger.critical(f"🛑 Critical failure: {e}", exc_info=True)
         stats_collector.update_error(stage="PIPELINE_ERROR", message=str(e))
         sys.exit(1)
