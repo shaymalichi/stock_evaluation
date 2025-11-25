@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pydantic import BaseModel
 from contextlib import asynccontextmanager
 
@@ -12,13 +12,10 @@ from src.utils.stats_collector import StatsCollector
 from src.core.logger import setup_logging
 import logging
 
-pipeline: StockAnalysisPipeline = None
 logger = logging.getLogger("API")
 
-
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    global pipeline
+async def lifespan(app_: FastAPI):
     setup_logging()
     logger.info("🚀 Server starting up...")
 
@@ -33,6 +30,7 @@ async def lifespan(app: FastAPI):
     analyzer = GeminiAnalyzer(api_key=gemini_key)
 
     pipeline = StockAnalysisPipeline(cached_provider, analyzer, stats)
+    app_.state.pipeline = pipeline
 
     yield
 
@@ -47,17 +45,22 @@ class AnalysisRequest(BaseModel):
 
 
 @app.post("/analyze")
-async def analyze_stock(request: AnalysisRequest):
+async def analyze_stock(request: AnalysisRequest, internal_request: Request):
     """
     Receives a ticker, runs the Pipeline and returns the complete report.
     """
     logger.info(f"📨 Received analysis request for {request.ticker}")
 
     try:
+        local_pipeline: StockAnalysisPipeline = internal_request.app.state.pipeline
+
+        if not local_pipeline:
+            raise HTTPException(status_code=503, detail="Analysis pipeline not ready.")
+
         fetch_count = settings.ARTICLES_TO_FETCH
         inference_count = settings.ARTICLES_TO_INFERENCE
 
-        report = await pipeline.run(request.ticker, fetch_count, inference_count)
+        report = await local_pipeline.run(request.ticker, fetch_count, inference_count)
         return report
 
     except Exception as e:
