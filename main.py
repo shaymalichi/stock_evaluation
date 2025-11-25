@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
 
     base_provider = NewsAPIClient(api_key=news_key)
-    retry_provider = AutoRetryProvider(inner_provider=base_provider, max_retries=3)
+    retry_provider = AutoRetryProvider(inner_provider=base_provider, stats=stats_collector, max_retries=3)
     final_news_provider = CachedNewsProvider(retry_provider, cache_dir="data/cache", ttl_seconds=ttl_seconds)
     my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
 
