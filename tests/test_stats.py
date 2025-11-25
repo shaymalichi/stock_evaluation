@@ -1,5 +1,3 @@
-import os
-import pytest
 from src.utils.stats_collector import StatsCollector
 
 
