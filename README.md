@@ -66,6 +66,12 @@ The script will:
    - The overall sentiment index and category.
    - The most positive and most negative headlines, with brief explanations.
 
+Run the server to expose the api
+```bash
+   uvicorn src.api.server:app --reload
+```
+there is a ui interface for the api at `http://localhost:8000/docs`
+
 ---
 
 ## Example Output (Conceptual)
