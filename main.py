@@ -34,6 +34,7 @@ async def main():
         sys.exit(1)
 
     ticker = sys.argv[1].upper()
+
     logger.info(f"🚀 Starting analysis for ticker: {ticker}")
 
     news_key = settings.NEWS_API_KEY.get_secret_value()
