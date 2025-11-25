@@ -27,7 +27,9 @@ class StatsCollector:
         self.stats: Dict[str, Any] = {}
         self.start_time = time.time()
         # Ensure the reports directory exists
-        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
+        directory = os.path.dirname(self.filename)
+        if directory:
+            os.makedirs(directory, exist_ok=True)
         self._initialize_csv()
 
     def _initialize_csv(self):
