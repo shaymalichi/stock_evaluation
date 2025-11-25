@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, AsyncMock
 from src.core.pipeline import StockAnalysisPipeline
 from src.core.interfaces import INewsProvider, IStockAnalyzer
 from src.utils.stats_collector import StatsCollector
@@ -22,7 +22,7 @@ def mock_analyzer():
     analyzer = MagicMock(spec=IStockAnalyzer)
 
     # Step 1: Filtering (RAG)
-    analyzer.filter_relevant.return_value = ["Fake News Content"]
+    analyzer.filter_relevant = AsyncMock(return_value=["Fake News Content"])
 
     # Step 2: Analysis of each article
     analyzer.analyze.return_value = {
@@ -40,8 +40,8 @@ def mock_analyzer():
     }
     return analyzer
 
-
-def test_pipeline_flow(mock_news_provider, mock_analyzer, tmp_path):
+@pytest.mark.asyncio
+async def test_pipeline_flow(mock_news_provider, mock_analyzer, tmp_path):
     """
     Tests that the pipeline runs all steps in the correct order
     without actually calling external APIs.
@@ -58,7 +58,7 @@ def test_pipeline_flow(mock_news_provider, mock_analyzer, tmp_path):
     )
 
     # Run the pipeline
-    result = pipeline.run("AAPL", fetch_count=10, inference_count=2)
+    result = await pipeline.run("AAPL", fetch_count=10, inference_count=2)
 
     # --- Assertions ---
 
@@ -79,13 +79,14 @@ def test_pipeline_flow(mock_news_provider, mock_analyzer, tmp_path):
     assert stats.stats['articles_returned'] == 1
     assert stats.stats['run_status'] == "IN_PROGRESS"  # Changes to OK only in main.py
 
-def test_pipeline_fails_on_no_rag_results(mock_news_provider, mock_analyzer, tmp_path):
+@pytest.mark.asyncio
+async def test_pipeline_fails_on_no_rag_results(mock_news_provider, mock_analyzer, tmp_path):
     """
     Tests the scenario where the RAG filtering component fails
     to return any relevant articles, verifying the pipeline's error handling.
     """
     # 1. Force the RAG component (mock_analyzer) to return an empty list
-    mock_analyzer.filter_relevant.return_value = []
+    mock_analyzer.filter_relevant = AsyncMock(return_value=[])
 
     temp_csv = tmp_path / "test_rag_fail.csv"
     stats = StatsCollector(filename=str(temp_csv))
@@ -99,4 +100,4 @@ def test_pipeline_fails_on_no_rag_results(mock_news_provider, mock_analyzer, tmp
     # 3. Assert that the specific exception is raised
     # We expect the function to throw an Exception with a message matching what's defined in pipeline.py
     with pytest.raises(Exception, match="RAG returned no relevant articles."):
-        pipeline.run("AAPL", fetch_count=10, inference_count=2)
+        await pipeline.run("AAPL", fetch_count=10, inference_count=2)

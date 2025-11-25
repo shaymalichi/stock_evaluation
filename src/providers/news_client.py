@@ -3,7 +3,7 @@
 import json
 import os
 import time
-import requests
+import httpx
 import logging
 from typing import List, Dict, Any
 
@@ -17,8 +17,8 @@ class NewsAPIClient(INewsProvider):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
-        return fetch_articles_raw(ticker, self.api_key, count)
+    async def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+        return await fetch_articles_raw(ticker, self.api_key, count)
 
 
 class CachedNewsProvider(INewsProvider):
@@ -30,7 +30,7 @@ class CachedNewsProvider(INewsProvider):
         if not os.path.exists(self.cache_dir):
             os.makedirs(self.cache_dir, exist_ok=True)
 
-    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+    async def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
         cache_file = os.path.join(self.cache_dir, f"{ticker}_news.json")
 
         if self._is_cache_valid(cache_file):
@@ -38,7 +38,7 @@ class CachedNewsProvider(INewsProvider):
             return self._load_from_cache(cache_file)
 
         logger.info(f"🌐 Missed cache. Asking inner provider for {ticker}...")
-        articles = self.inner_provider.fetch_articles(ticker, count)
+        articles = await self.inner_provider.fetch_articles(ticker, count)
 
         if articles:
             self._save_to_cache(cache_file, articles)
@@ -77,7 +77,7 @@ class AutoRetryProvider(INewsProvider):
         self.max_retries = max_retries
         self.wait_seconds = wait_seconds
 
-    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+    async def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
 
         def update_retry_stats(retry_state):
             retries = retry_state.attempt_number - 1
@@ -92,17 +92,17 @@ class AutoRetryProvider(INewsProvider):
             wait=wait_fixed(self.wait_seconds),
             after=update_retry_stats
         )
-        def _safe_fetch():
-            return self.inner_provider.fetch_articles(ticker, count)
+        async def _safe_fetch():
+            return await self.inner_provider.fetch_articles(ticker, count)
 
         try:
-            return _safe_fetch()
+            return await _safe_fetch()
         except Exception as e:
             logger.error(f"💀 All retry attempts failed: {e}")
             return []
 
 
-def fetch_articles_raw(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:
+async def fetch_articles_raw(ticker_symbol: str, news_api_key: str, num_results) -> List[Dict[str, str]]:
     url = "https://newsapi.org/v2/everything"
     params = {
         'q': f"{ticker_symbol} stock",
@@ -113,9 +113,10 @@ def fetch_articles_raw(ticker_symbol: str, news_api_key: str, num_results) -> Li
     }
 
     try:
-        response = requests.get(url, params=params)
-        response.raise_for_status()
-        data = response.json()
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, params=params)
+            response.raise_for_status()
+            data = response.json()
 
         if data['status'] != 'ok':
             logger.error(f"NewsAPI Error: {data.get('message', 'Unknown error')}")
@@ -134,6 +135,6 @@ def fetch_articles_raw(ticker_symbol: str, news_api_key: str, num_results) -> Li
 
         return filtered_articles
 
-    except requests.exceptions.RequestException as e:
+    except httpx.HTTPError as e:
         logger.error(f"Network Error fetching search results: {e}")
         return []

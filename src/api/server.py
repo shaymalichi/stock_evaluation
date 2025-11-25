@@ -47,7 +47,7 @@ class AnalysisRequest(BaseModel):
 
 
 @app.post("/analyze")
-def analyze_stock(request: AnalysisRequest):
+async def analyze_stock(request: AnalysisRequest):
     """
     Receives a ticker, runs the Pipeline and returns the complete report.
     """
@@ -57,7 +57,7 @@ def analyze_stock(request: AnalysisRequest):
         fetch_count = settings.ARTICLES_TO_FETCH
         inference_count = settings.ARTICLES_TO_INFERENCE
 
-        report = pipeline.run(request.ticker, fetch_count, inference_count)
+        report = await pipeline.run(request.ticker, fetch_count, inference_count)
         return report
 
     except Exception as e:

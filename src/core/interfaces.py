@@ -4,19 +4,19 @@ from typing import List, Dict, Any
 
 class INewsProvider(ABC):
     @abstractmethod
-    def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
+    async def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
         pass
 
 
 class IStockAnalyzer(ABC):
     @abstractmethod
-    def filter_relevant(self, ticker: str, articles: List[Dict], count: int) -> List[str]:
+    async def filter_relevant(self, ticker: str, articles: List[Dict], count: int) -> List[str]:
         pass
 
     @abstractmethod
-    def analyze(self, ticker: str, articles: List[str]) -> Dict[str, Any]:
+    async def analyze(self, ticker: str, articles: List[str]) -> Dict[str, Any]:
         pass
 
     @abstractmethod
-    def synthesize(self, ticker: str, analysis_results: List[Dict]) -> Dict[str, Any]:
+    async def synthesize(self, ticker: str, analysis_results: List[Dict]) -> Dict[str, Any]:
         pass

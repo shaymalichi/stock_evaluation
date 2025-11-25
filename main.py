@@ -1,7 +1,7 @@
 import logging
 import os
 import sys
-from typing import Dict, Any
+import asyncio
 sys.path.append(os.getcwd())
 from src.core.config import settings
 from src.providers.news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
@@ -9,6 +9,7 @@ from src.providers.analysis_client import GeminiAnalyzer
 from src.core.pipeline import StockAnalysisPipeline
 from src.core.logger import setup_logging
 from src.utils.stats_collector import StatsCollector
+from typing import Dict, Any
 
 logger = logging.getLogger("MAIN")
 
@@ -25,7 +26,7 @@ def print_final_recommendation(recommendation_data: Dict[str, Any], ticker: str)
     print("\n" + "💰" * 53 + "\n")
 
 
-if __name__ == "__main__":
+async def main():
     setup_logging()
 
     if len(sys.argv) < 2:
@@ -40,7 +41,7 @@ if __name__ == "__main__":
 
     fetch_count = settings.ARTICLES_TO_FETCH
     inference_count = settings.ARTICLES_TO_INFERENCE
-    ttl_seconds = settings.CACHE_TTL_SECONDS\
+    ttl_seconds = settings.CACHE_TTL_SECONDS
 
     stats_collector = StatsCollector()
     stats_collector.set_initial_context(
@@ -49,12 +50,10 @@ if __name__ == "__main__":
         articles_to_inference=inference_count
     )
 
-
     base_provider = NewsAPIClient(api_key=news_key)
     retry_provider = AutoRetryProvider(inner_provider=base_provider, stats=stats_collector, max_retries=3)
     final_news_provider = CachedNewsProvider(retry_provider, cache_dir="data/cache", ttl_seconds=ttl_seconds)
     my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
-
 
     pipeline = StockAnalysisPipeline(
         news_provider=final_news_provider,
@@ -63,7 +62,7 @@ if __name__ == "__main__":
     )
 
     try:
-        final_report = pipeline.run(ticker, fetch_count, inference_count)
+        final_report = await pipeline.run(ticker, fetch_count, inference_count)
         print_final_recommendation(final_report, ticker)
         logger.info("✅ Analysis completed successfully.")
         stats_collector.finalize(status='OK')
@@ -72,3 +71,7 @@ if __name__ == "__main__":
         logger.critical(f"🛑 Critical failure: {e}", exc_info=True)
         stats_collector.update_error(stage="PIPELINE_ERROR", message=str(e))
         sys.exit(1)
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

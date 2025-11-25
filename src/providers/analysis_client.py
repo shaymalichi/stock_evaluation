@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import concurrent.futures
+import asyncio
 import json
 import sys
 import time
@@ -17,16 +17,16 @@ class GeminiAnalyzer(IStockAnalyzer):
     def __init__(self, api_key: str):
         self.api_key = api_key
 
-    def filter_relevant(self, ticker: str, articles: List[Dict], count: int) -> List[str]:
+    async def filter_relevant(self, ticker: str, articles: List[Dict], count: int) -> List[str]:
         article_texts, index = embed_articles(articles)
         relevant_texts = search_relevant_articles(ticker, article_texts, index, count)
         return relevant_texts
 
-    def analyze(self, ticker: str, articles: List[str]) -> Dict[str, Any]:
-        return analyze_articles_concurrently(ticker, articles, self.api_key)
+    async def analyze(self, ticker: str, articles: List[str]) -> Dict[str, Any]:
+        return await analyze_articles_concurrently(ticker, articles, self.api_key)
 
-    def synthesize(self, ticker: str, analysis_results: List[Dict]) -> Dict[str, Any]:
-        return synthesize_report(ticker, analysis_results, self.api_key)
+    async def synthesize(self, ticker: str, analysis_results: List[Dict]) -> Dict[str, Any]:
+        return await synthesize_report(ticker, analysis_results, self.api_key)
 
 
 # For articles summaries
@@ -99,7 +99,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
     return [article_texts[i] for i in relevant_indices]
 
 
-def analyze_articles_concurrently(
+async def analyze_articles_concurrently(
     ticker_symbol: str,
     relevant_articles_text: List[str],
     gemini_api_key: str,
@@ -108,34 +108,25 @@ def analyze_articles_concurrently(
     Run sentiment analysis for multiple articles concurrently and return
     the aggregated analysis data structure expected by print_analysis_report.
     """
-    articles_for_threading = [{"content": text} for text in relevant_articles_text]
+    tasks = [
+        analyze_single_article(ticker_symbol, {"content": text}, gemini_api_key)
+        for text in relevant_articles_text
+    ]
     results: List[Dict[str, Any]] = []
     errors: List[str] = []
 
-    max_workers = len(articles_for_threading) or 1
+    analyses_results = await asyncio.gather(*tasks, return_exceptions=True)
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_article = {
-            executor.submit(
-                analyze_single_article,
-                ticker_symbol,
-                article,
-                gemini_api_key,
-            ): article
-            for article in articles_for_threading
-        }
+    for result in analyses_results:
+        if isinstance(result, Exception):
+            errors.append(str(result))
+            print(f"⚠️ Task error: {result}", file=sys.stderr)
+            continue
 
-        for future in concurrent.futures.as_completed(future_to_article):
-            try:
-                result = future.result()
-                if "news_items" in result:
-                    results.extend(result["news_items"])
-                elif "error" in result:
-                    errors.append(result["error"])
-                    print(f"⚠️ Thread error: {result['error']}", file=sys.stderr)
-            except Exception as exc:
-                errors.append(str(exc))
-                print(f"A thread generated an exception: {exc}", file=sys.stderr)
+        if "news_items" in result:
+            results.extend(result["news_items"])
+        elif "error" in result:
+            errors.append(result["error"])
 
     return {
         "ticker": ticker_symbol,
@@ -145,8 +136,7 @@ def analyze_articles_concurrently(
         "errors_count": len(errors),
     }
 
-
-def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -> Dict[str, Any]:
+async def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -> Dict[str, Any]:
     """
     Analyzes a single news article for sentiment using Gemini API and returns a structured JSON
     ready for merging.
@@ -179,7 +169,7 @@ def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -
             "response_schema": ANALYSIS_SCHEMA
         }
 
-        response = model.generate_content(
+        response = await model.generate_content_async(
             prompt,
             generation_config=generation_config
         )
@@ -193,7 +183,7 @@ def analyze_single_article(ticker: str, article: Dict[str, str], api_key: str) -
                 "raw_response": response.text if 'response' in locals() else 'N/A'}
 
 
-def synthesize_report(ticker: str, analyzed_news_items: List[Dict[str, Any]], api_key: str) -> Dict[str, str]:
+async def synthesize_report(ticker: str, analyzed_news_items: List[Dict[str, Any]], api_key: str) -> Dict[str, str]:
     context_text = "Analysis Results from Individual Articles:\n"
     for item in analyzed_news_items:
         context_text += f"- Score {item['sentiment_score']}/10 ({item['sentiment_category']}): {item['impact_reason']} (Source: {item['headline']})\n"
@@ -221,5 +211,5 @@ def synthesize_report(ticker: str, analyzed_news_items: List[Dict[str, Any]], ap
         "response_schema": REPORT_SCHEMA
     }
 
-    response = model.generate_content(prompt, generation_config=generation_config)
+    response = await model.generate_content_async(prompt, generation_config=generation_config)
     return json.loads(response.text)

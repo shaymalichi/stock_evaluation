@@ -11,13 +11,13 @@ class StockAnalysisPipeline:
         self.analyzer = analyzer
         self.stats = stats
 
-    def run(self, ticker: str, fetch_count: int, inference_count: int):
-        logger.info(f"🔄 Pipeline started for {ticker}")  # שימוש במקום print
+    async def run(self, ticker: str, fetch_count: int, inference_count: int):
+        logger.info(f"🔄 Pipeline started for {ticker}")
 
         logger.debug(f"Step 1: Fetching {fetch_count} articles...")
         start_time_fetch = time.time()
 
-        articles = self.news_provider.fetch_articles(ticker, fetch_count)
+        articles = await self.news_provider.fetch_articles(ticker, fetch_count)
 
         end_time_fetch = time.time()
         fetch_duration = end_time_fetch - start_time_fetch
@@ -37,7 +37,7 @@ class StockAnalysisPipeline:
         print(f"✅ Fetched {len(articles)} articles in {fetch_duration:.2f}s.")
 
         print(" 2. Filtering relevant news (RAG)...")
-        relevant_texts = self.analyzer.filter_relevant(ticker, articles, count=inference_count)
+        relevant_texts = await self.analyzer.filter_relevant(ticker, articles, count=inference_count)
 
         self.stats.update('relevant_articles_found', len(relevant_texts))
 
@@ -47,7 +47,7 @@ class StockAnalysisPipeline:
         print(f" 3. Analyzing {len(relevant_texts)} articles concurrently...")
         start_time_analysis = time.time()
 
-        analysis_data = self.analyzer.analyze(ticker, relevant_texts)
+        analysis_data = await self.analyzer.analyze(ticker, relevant_texts)
 
         end_time_analysis = time.time()
         analysis_duration = end_time_analysis - start_time_analysis
@@ -60,7 +60,7 @@ class StockAnalysisPipeline:
         print("✨ Synthesizing final report...")
         start_time_synthesis = time.time()
 
-        final_report = self.analyzer.synthesize(ticker, analysis_data['news_items'])
+        final_report = await self.analyzer.synthesize(ticker, analysis_data['news_items'])
 
         end_time_synthesis = time.time()
         synthesis_duration = end_time_synthesis - start_time_synthesis
