@@ -72,6 +72,20 @@ Run the server to expose the api
 ```
 there is a ui interface for the api at `http://localhost:8000/docs`
 
+## Docker 
+
+```bash
+docker build -t stock_evaluation_image .
+
+docker run -d \\
+  -p 8000:8000 \\
+  --name stock-app \\
+  -e NEWS_API_KEY='your_newsapi_key_here' \\
+  -e GEMINI_API_KEY='your_gemini_api_key_here' \\
+  stock_evaluation_image
+
+````
+
 ---
 
 ## Example Output (Conceptual)
