@@ -1,0 +1,173 @@
+diff --git a/main.py b/main.py
+index ca50311..9c989b8 100644
+--- a/main.py
++++ b/main.py
+@@ -1,6 +1,8 @@
++import os
+ import sys
+ from typing import Dict, Any
+-from src.core import config
++sys.path.append(os.getcwd())
++from src.core.config import settings
+ from src.providers.news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
+ from src.providers.analysis_client import GeminiAnalyzer
+ from src.core.pipeline import StockAnalysisPipeline
+@@ -27,23 +29,27 @@ if __name__ == "__main__":
+ 
+     ticker = sys.argv[1].upper()
+ 
+-    news_key, gemini_key = config.load_and_validate_keys()
++    news_key = settings.NEWS_API_KEY.get_secret_value()
++    gemini_key = settings.GEMINI_API_KEY.get_secret_value()
+ 
+-    fetch_count = int(config.ARTICLES_TO_FETCH)
+-    inference_count = int(config.ARTICLES_TO_INFERENCE)
++    fetch_count = settings.ARTICLES_TO_FETCH
++    inference_count = settings.ARTICLES_TO_INFERENCE
++    ttl_seconds = settings.CACHE_TTL_SECONDS\
+ 
+-    base_provider = NewsAPIClient(api_key=news_key)
+-    retry_provider = AutoRetryProvider(inner_provider=base_provider, max_retries=3)
+-    final_news_provider = CachedNewsProvider(retry_provider, cache_dir=config.CACHE_DIR, ttl_seconds=config.CACHE_TTL_SECONDS)
+-    my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
+     stats_collector = StatsCollector()
+-
+     stats_collector.set_initial_context(
+         ticker=ticker,
+         articles_to_fetch=fetch_count,
+         articles_to_inference=inference_count
+     )
+ 
++
++    base_provider = NewsAPIClient(api_key=news_key)
++    retry_provider = AutoRetryProvider(inner_provider=base_provider, max_retries=3)
++    final_news_provider = CachedNewsProvider(retry_provider, cache_dir="data/cache", ttl_seconds=ttl_seconds)
++    my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
++
++
+     pipeline = StockAnalysisPipeline(
+         news_provider=final_news_provider,
+         analyzer=my_gemini_client,
+diff --git a/requirements.txt b/requirements.txt
+index 55c4147..1bfb5dd 100644
+--- a/requirements.txt
++++ b/requirements.txt
+@@ -1,7 +1,9 @@
++pydantic
+ protobuf
+ numpy
+ faiss-cpu
+ requests>=2.31.0
+ google-generativeai>=0.3.0
+ python-dotenv>=1.0.0
+-tenacity
+\ No newline at end of file
++tenacity
++pydantic-settings>=2.0.0
+\ No newline at end of file
+diff --git a/src/core/config.py b/src/core/config.py
+index 2534adc..d71d6e3 100644
+--- a/src/core/config.py
++++ b/src/core/config.py
+@@ -1,42 +1,36 @@
+ #!/usr/bin/env python3
+ 
+-import os
+ import sys
+-from dotenv import load_dotenv
++from pydantic_settings import BaseSettings, SettingsConfigDict
++from pydantic import Field, SecretStr
+ 
+-# load environment from .env at repo root if present
+-load_dotenv()
+ 
+-NEWS_API_KEY = os.getenv('NEWS_API_KEY')
+-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
++class Settings(BaseSettings):
++    """
++    Application configuration using Pydantic.
++    This class automatically loads environment variables from the .env file,
++    validates their types, and ensures required keys are present.
++    """
+ 
+-CACHE_DIR = os.getenv('CACHE_DIR', os.path.join('data', 'cache'))
+-CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', 3600))
++    # --- REQUIRED FIELDS ---
++    NEWS_API_KEY: SecretStr
++    GEMINI_API_KEY: SecretStr
+ 
+-try:
+-    ARTICLES_TO_FETCH = int(os.getenv('ARTICLES_TO_FETCH', 50))
+-    ARTICLES_TO_INFERENCE = int(os.getenv('ARTICLES_TO_INFERENCE', 5))
+-except ValueError:
+-    print("🛑 Error: ARTICLES_TO_FETCH or ARTICLES_TO_INFERENCE must be integers in .env.", file=sys.stderr)
+-    sys.exit(1)
++    # --- OPTIONAL FIELDS (With Defaults) ---
++    ARTICLES_TO_FETCH: int = Field(default=50, gt=0, description="Number of articles to fetch from NewsAPI")
++    ARTICLES_TO_INFERENCE: int = Field(default=5, gt=0, description="Number of articles to pass to the LLM")
++    CACHE_TTL_SECONDS: int = Field(default=3600, gt=0, description="Time-to-live for cache in seconds")
+ 
++    # --- CONFIGURATION ---
++    model_config = SettingsConfigDict(
++        env_file=".env",
++        env_file_encoding="utf-8",
++        extra="ignore"
++    )
+ 
+-def load_and_validate_keys():
+-    """
+-    Checks if API keys are loaded and exits if they are missing.
+-    Returns:
+-        (str, str): A tuple containing (news_api_key, gemini_api_key)
+-    """
+-    if not all([NEWS_API_KEY, GEMINI_API_KEY]):
+-        print("🛑 Error: One or more API keys/IDs are missing from the .env file.", file=sys.stderr)
+-        sys.exit(1)
+-
+-    # Ensure default directories exist
+-    try:
+-        os.makedirs(CACHE_DIR, exist_ok=True)
+-        os.makedirs(os.path.join('data', 'reports'), exist_ok=True)
+-    except (OSError, IOError) as e:
+-        # Non-fatal; continue
+-        pass
+-
+-    return NEWS_API_KEY, GEMINI_API_KEY
++try:
++    settings = Settings()
++
++except Exception as e:
++    print(f"🛑 Configuration Error: {e}", file=sys.stderr)
++    sys.exit(1)
+\ No newline at end of file
+diff --git a/src/providers/analysis_client.py b/src/providers/analysis_client.py
+index 2bf3ea2..25bb485 100644
+--- a/src/providers/analysis_client.py
++++ b/src/providers/analysis_client.py
+@@ -1,6 +1,6 @@
+ #!/usr/bin/env python3
+ 
+-import concurrent
++import concurrent.futures
+ import json
+ import sys
+ import time
+@@ -8,7 +8,8 @@ from typing import List, Dict, Any
+ import faiss
+ import google.generativeai as genai
+ import numpy as np
+-from src.core import config
++
++from src.core.config import settings
+ from src.core.interfaces import IStockAnalyzer
+ 
+ 
+@@ -56,7 +57,7 @@ REPORT_SCHEMA = {
+ 
+ 
+ def embed_articles(articles: List[Dict[str, str]]):
+-    genai.configure(api_key=config.GEMINI_API_KEY)
++    genai.configure(api_key=settings.GEMINI_API_KEY.get_secret_value())
+     genai.GenerativeModel('models/text-embedding-004')
+     article_texts = [article['content'] for article in articles]
+ 

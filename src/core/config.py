@@ -1,42 +1,36 @@
 #!/usr/bin/env python3
 
-import os
 import sys
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr
 
-# load environment from .env at repo root if present
-load_dotenv()
 
-NEWS_API_KEY = os.getenv('NEWS_API_KEY')
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+class Settings(BaseSettings):
+    """
+    Application configuration using Pydantic.
+    This class automatically loads environment variables from the .env file,
+    validates their types, and ensures required keys are present.
+    """
 
-CACHE_DIR = os.getenv('CACHE_DIR', os.path.join('data', 'cache'))
-CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', 3600))
+    # --- REQUIRED FIELDS ---
+    NEWS_API_KEY: SecretStr
+    GEMINI_API_KEY: SecretStr
+
+    # --- OPTIONAL FIELDS (With Defaults) ---
+    ARTICLES_TO_FETCH: int = Field(default=50, gt=0, description="Number of articles to fetch from NewsAPI")
+    ARTICLES_TO_INFERENCE: int = Field(default=5, gt=0, description="Number of articles to pass to the LLM")
+    CACHE_TTL_SECONDS: int = Field(default=3600, gt=0, description="Time-to-live for cache in seconds")
+
+    # --- CONFIGURATION ---
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore"
+    )
 
 try:
-    ARTICLES_TO_FETCH = int(os.getenv('ARTICLES_TO_FETCH', 50))
-    ARTICLES_TO_INFERENCE = int(os.getenv('ARTICLES_TO_INFERENCE', 5))
-except ValueError:
-    print("🛑 Error: ARTICLES_TO_FETCH or ARTICLES_TO_INFERENCE must be integers in .env.", file=sys.stderr)
+    settings = Settings()
+
+except Exception as e:
+    print(f"🛑 Configuration Error: {e}", file=sys.stderr)
     sys.exit(1)
-
-
-def load_and_validate_keys():
-    """
-    Checks if API keys are loaded and exits if they are missing.
-    Returns:
-        (str, str): A tuple containing (news_api_key, gemini_api_key)
-    """
-    if not all([NEWS_API_KEY, GEMINI_API_KEY]):
-        print("🛑 Error: One or more API keys/IDs are missing from the .env file.", file=sys.stderr)
-        sys.exit(1)
-
-    # Ensure default directories exist
-    try:
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        os.makedirs(os.path.join('data', 'reports'), exist_ok=True)
-    except (OSError, IOError) as e:
-        # Non-fatal; continue
-        pass
-
-    return NEWS_API_KEY, GEMINI_API_KEY

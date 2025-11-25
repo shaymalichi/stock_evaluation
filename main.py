@@ -1,6 +1,8 @@
+import os
 import sys
 from typing import Dict, Any
-from src.core import config
+sys.path.append(os.getcwd())
+from src.core.config import settings
 from src.providers.news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
 from src.providers.analysis_client import GeminiAnalyzer
 from src.core.pipeline import StockAnalysisPipeline
@@ -27,22 +29,26 @@ if __name__ == "__main__":
 
     ticker = sys.argv[1].upper()
 
-    news_key, gemini_key = config.load_and_validate_keys()
+    news_key = settings.NEWS_API_KEY.get_secret_value()
+    gemini_key = settings.GEMINI_API_KEY.get_secret_value()
 
-    fetch_count = int(config.ARTICLES_TO_FETCH)
-    inference_count = int(config.ARTICLES_TO_INFERENCE)
+    fetch_count = settings.ARTICLES_TO_FETCH
+    inference_count = settings.ARTICLES_TO_INFERENCE
+    ttl_seconds = settings.CACHE_TTL_SECONDS\
 
-    base_provider = NewsAPIClient(api_key=news_key)
-    retry_provider = AutoRetryProvider(inner_provider=base_provider, max_retries=3)
-    final_news_provider = CachedNewsProvider(retry_provider, cache_dir=config.CACHE_DIR, ttl_seconds=config.CACHE_TTL_SECONDS)
-    my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
     stats_collector = StatsCollector()
-
     stats_collector.set_initial_context(
         ticker=ticker,
         articles_to_fetch=fetch_count,
         articles_to_inference=inference_count
     )
+
+
+    base_provider = NewsAPIClient(api_key=news_key)
+    retry_provider = AutoRetryProvider(inner_provider=base_provider, max_retries=3)
+    final_news_provider = CachedNewsProvider(retry_provider, cache_dir="data/cache", ttl_seconds=ttl_seconds)
+    my_gemini_client = GeminiAnalyzer(api_key=gemini_key)
+
 
     pipeline = StockAnalysisPipeline(
         news_provider=final_news_provider,

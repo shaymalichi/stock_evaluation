@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import concurrent
+import concurrent.futures
 import json
 import sys
 import time
@@ -8,7 +8,8 @@ from typing import List, Dict, Any
 import faiss
 import google.generativeai as genai
 import numpy as np
-from src.core import config
+
+from src.core.config import settings
 from src.core.interfaces import IStockAnalyzer
 
 
@@ -56,7 +57,7 @@ REPORT_SCHEMA = {
 
 
 def embed_articles(articles: List[Dict[str, str]]):
-    genai.configure(api_key=config.GEMINI_API_KEY)
+    genai.configure(api_key=settings.GEMINI_API_KEY.get_secret_value())
     genai.GenerativeModel('models/text-embedding-004')
     article_texts = [article['content'] for article in articles]
 
