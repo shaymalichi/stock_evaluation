@@ -18,7 +18,5 @@ def mock_logger_file_handler():
     Prevents creating files and ensures the mock behaves like a proper Handler.
     """
     with patch("logging.FileHandler") as MockHandler:
-        # We define a 'level' field for the mocked Instance as a number (0)
-        # This prevents the error in comparison (int >= MagicMock)
         MockHandler.return_value.level = 0
         yield
