@@ -8,8 +8,8 @@ from typing import List, Dict, Any
 import faiss
 import google.generativeai as genai
 import numpy as np
-import config
-from interfaces import IStockAnalyzer
+from src.core import config
+from src.core.interfaces import IStockAnalyzer
 
 
 class GeminiAnalyzer(IStockAnalyzer):
@@ -26,6 +26,7 @@ class GeminiAnalyzer(IStockAnalyzer):
 
     def synthesize(self, ticker: str, analysis_results: List[Dict]) -> Dict[str, Any]:
         return synthesize_report(ticker, analysis_results, self.api_key)
+
 
 # For articles summaries
 ANALYSIS_SCHEMA = {
@@ -53,6 +54,7 @@ REPORT_SCHEMA = {
         "required": ["overall_summary", "final_sentiment", "recommendation"]
     }
 
+
 def embed_articles(articles: List[Dict[str, str]]):
     genai.configure(api_key=config.GEMINI_API_KEY)
     genai.GenerativeModel('models/text-embedding-004')
@@ -67,7 +69,7 @@ def embed_articles(articles: List[Dict[str, str]]):
     d = len(embeddings_list[0])
     embeddings_np = np.array(embeddings_list).astype('float32')
     index = faiss.IndexFlatL2(d)
-    index.add(embeddings_np) # type: ignore[arg-type]
+    index.add(embeddings_np)  # type: ignore[arg-type]
     return article_texts, index
 
 
@@ -94,6 +96,7 @@ def search_relevant_articles(ticker_symbol: str, article_texts: list, index: fai
     D, I = index.search(query_embedding_np, articles_for_inference)
     relevant_indices = I[0]
     return [article_texts[i] for i in relevant_indices]
+
 
 def analyze_articles_concurrently(
     ticker_symbol: str,

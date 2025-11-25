@@ -4,11 +4,13 @@ import os
 import sys
 from dotenv import load_dotenv
 
+# load environment from .env at repo root if present
 load_dotenv()
 
 NEWS_API_KEY = os.getenv('NEWS_API_KEY')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-CACHE_DIR = os.getenv('CACHE_DIR')
+
+CACHE_DIR = os.getenv('CACHE_DIR', os.path.join('data', 'cache'))
 CACHE_TTL_SECONDS = int(os.getenv('CACHE_TTL_SECONDS', 3600))
 
 try:
@@ -17,6 +19,7 @@ try:
 except ValueError:
     print("🛑 Error: ARTICLES_TO_FETCH or ARTICLES_TO_INFERENCE must be integers in .env.", file=sys.stderr)
     sys.exit(1)
+
 
 def load_and_validate_keys():
     """
@@ -27,5 +30,13 @@ def load_and_validate_keys():
     if not all([NEWS_API_KEY, GEMINI_API_KEY]):
         print("🛑 Error: One or more API keys/IDs are missing from the .env file.", file=sys.stderr)
         sys.exit(1)
+
+    # Ensure default directories exist
+    try:
+        os.makedirs(CACHE_DIR, exist_ok=True)
+        os.makedirs(os.path.join('data', 'reports'), exist_ok=True)
+    except (OSError, IOError) as e:
+        # Non-fatal; continue
+        pass
 
     return NEWS_API_KEY, GEMINI_API_KEY

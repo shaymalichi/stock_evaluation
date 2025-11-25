@@ -1,10 +1,10 @@
 import sys
 from typing import Dict, Any
-import config
-from news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
-from analysis_client import GeminiAnalyzer
-from pipeline import StockAnalysisPipeline
-from stats_collector import StatsCollector
+from src.core import config
+from src.providers.news_client import NewsAPIClient, CachedNewsProvider, AutoRetryProvider
+from src.providers.analysis_client import GeminiAnalyzer
+from src.core.pipeline import StockAnalysisPipeline
+from src.utils.stats_collector import StatsCollector
 
 
 def print_final_recommendation(recommendation_data: Dict[str, Any], ticker: str):

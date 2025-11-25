@@ -1,6 +1,6 @@
 import time
-from stats_collector import StatsCollector
-from interfaces import INewsProvider, IStockAnalyzer
+from src.utils.stats_collector import StatsCollector
+from src.core.interfaces import INewsProvider, IStockAnalyzer
 
 
 class StockAnalysisPipeline:

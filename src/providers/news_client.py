@@ -9,7 +9,7 @@ from typing import List, Dict
 
 from tenacity import stop_after_attempt, retry, wait_fixed
 
-from interfaces import INewsProvider
+from src.core.interfaces import INewsProvider
 
 
 class NewsAPIClient(INewsProvider):
@@ -25,13 +25,13 @@ class CachedNewsProvider(INewsProvider):
     A caching wrapper for INewsProvider that persists results to local JSON files.
     """
 
-    def __init__(self, inner_provider: INewsProvider, cache_dir: str = "news_cache", ttl_seconds: int = 3600):
+    def __init__(self, inner_provider: INewsProvider, cache_dir: str = "data/cache", ttl_seconds: int = 3600):
         self.inner_provider = inner_provider
         self.cache_dir = cache_dir
         self.ttl_seconds = ttl_seconds
 
         if not os.path.exists(self.cache_dir):
-            os.makedirs(self.cache_dir)
+            os.makedirs(self.cache_dir, exist_ok=True)
 
     def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:
         cache_file = os.path.join(self.cache_dir, f"{ticker}_news.json")
@@ -67,6 +67,7 @@ class CachedNewsProvider(INewsProvider):
                 json.dump(data, f, indent=4)
         except Exception as e:
             print(f"⚠️ Cache save failed: {e}")
+
 
 class AutoRetryProvider(INewsProvider):
     """

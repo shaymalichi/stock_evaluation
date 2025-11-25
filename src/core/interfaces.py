@@ -1,6 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Dict, Any
 
+
 class INewsProvider(ABC):
     @abstractmethod
     def fetch_articles(self, ticker: str, count: int) -> List[Dict[str, str]]:

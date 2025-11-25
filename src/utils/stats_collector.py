@@ -22,10 +22,12 @@ class StatsCollector:
     Class for collecting and managing run statistics, saving them to a CSV file.
     """
 
-    def __init__(self, filename: str = 'run_stats.csv'):
+    def __init__(self, filename: str = os.path.join('data', 'reports', 'run_stats.csv')):
         self.filename = filename
         self.stats: Dict[str, Any] = {}
         self.start_time = time.time()
+        # Ensure the reports directory exists
+        os.makedirs(os.path.dirname(self.filename), exist_ok=True)
         self._initialize_csv()
 
     def _initialize_csv(self):
