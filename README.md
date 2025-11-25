@@ -1,7 +1,7 @@
 # Stock Evaluation – News Sentiment Analyzer
 
 This tool fetches recent news articles for a given stock ticker and uses Google Gemini to perform a structured sentiment analysis on them. It then computes an overall “fear/greed” style sentiment index for the stock and highlights the most positive and most negative news items.
-
+ 
 ---
 
 ## Features
