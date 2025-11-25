@@ -26,7 +26,7 @@ class StatsCollector:
         self.filename = filename
         self.stats: Dict[str, Any] = {}
         self.start_time = time.time()
-        # Ensure the reports directory exists
+
         directory = os.path.dirname(self.filename)
         if directory:
             os.makedirs(directory, exist_ok=True)
@@ -54,7 +54,6 @@ class StatsCollector:
             'run_status': 'IN_PROGRESS',
             'error_stage': 'N/A',
             'error_message': 'N/A',
-            # Initialize numeric fields to 0 or N/A to ensure CSV consistency
             'articles_requested': 0, 'articles_returned': 0, 'articles_after_filter': 0, 'fetch_duration_sec': 0.0,
             'relevant_articles_found': 0, 'analysis_success_count': 0, 'analysis_error_count': 0,
             'analysis_duration_sec': 0.0, 'sentiment_score_avg': 'N/A', 'sentiment_score_min': 'N/A',
@@ -71,8 +70,8 @@ class StatsCollector:
         """Updates the run status when an error occurs."""
         self.stats['run_status'] = 'FAILED'
         self.stats['error_stage'] = stage
-        self.stats['error_message'] = message.replace('\n', ' | ')  # Remove newlines for single-line CSV cell
-        self.finalize()  # Immediately write on error
+        self.stats['error_message'] = message.replace('\n', ' | ')  # Remove newlines
+        self.finalize()
 
     def finalize(self, status: str = 'OK'):
         """Calculates final metrics and writes the complete row to CSV."""
@@ -83,7 +82,6 @@ class StatsCollector:
         try:
             with open(self.filename, mode='a', newline='', encoding='utf-8') as file:
                 writer = csv.DictWriter(file, fieldnames=CSV_HEADERS)
-                # Ensure all required headers are present, filling missing with 'N/A'
                 row = {header: self.stats.get(header, 'N/A') for header in CSV_HEADERS}
                 writer.writerow(row)
             print(f"📊 [STATS] Run results saved to {self.filename} ({self.stats['run_id']}).")
@@ -96,7 +94,7 @@ class StatsCollector:
 
         self.update('analysis_duration_sec', round(analysis_duration_sec, 3))
         self.update('relevant_articles_found', len(news_items))
-        self.update('analysis_success_count', len(news_items))  # Assuming any item in news_items is a success
+        self.update('analysis_success_count', len(news_items))
 
         if not news_items:
             return
@@ -106,7 +104,6 @@ class StatsCollector:
         self.update('sentiment_score_min', min(item.get('sentiment_score', 0) for item in news_items))
         self.update('sentiment_score_max', max(item.get('sentiment_score', 0) for item in news_items))
 
-        # Count categories
         positive_count = sum(1 for item in news_items if item.get('sentiment_category') == 'POSITIVE')
         negative_count = sum(1 for item in news_items if item.get('sentiment_category') == 'NEGATIVE')
         neutral_count = sum(1 for item in news_items if item.get('sentiment_category') == 'NEUTRAL')
@@ -121,6 +118,5 @@ class StatsCollector:
         self.update('final_sentiment', recommendation_data.get('final_sentiment', 'N/A'))
         self.update('final_recommendation', recommendation_data.get('recommendation', 'N/A'))
 
-        # Store major risks as a JSON string
         major_risks = recommendation_data.get('major_risks', [])
         self.update('major_risks_json', json.dumps(major_risks))
