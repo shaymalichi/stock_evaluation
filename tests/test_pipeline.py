@@ -78,3 +78,25 @@ def test_pipeline_flow(mock_news_provider, mock_analyzer, tmp_path):
     # 5. Check that statistics were updated [cite: 94]
     assert stats.stats['articles_returned'] == 1
     assert stats.stats['run_status'] == "IN_PROGRESS"  # Changes to OK only in main.py
+
+def test_pipeline_fails_on_no_rag_results(mock_news_provider, mock_analyzer, tmp_path):
+    """
+    Tests the scenario where the RAG filtering component fails
+    to return any relevant articles, verifying the pipeline's error handling.
+    """
+    # 1. Force the RAG component (mock_analyzer) to return an empty list
+    mock_analyzer.filter_relevant.return_value = []
+
+    temp_csv = tmp_path / "test_rag_fail.csv"
+    stats = StatsCollector(filename=str(temp_csv))
+
+    pipeline = StockAnalysisPipeline(
+        news_provider=mock_news_provider,
+        analyzer=mock_analyzer,
+        stats=stats
+    )
+
+    # 3. Assert that the specific exception is raised
+    # We expect the function to throw an Exception with a message matching what's defined in pipeline.py
+    with pytest.raises(Exception, match="RAG returned no relevant articles."):
+        pipeline.run("AAPL", fetch_count=10, inference_count=2)
