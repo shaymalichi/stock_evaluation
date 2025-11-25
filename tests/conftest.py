@@ -15,8 +15,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 @pytest.fixture(autouse=True)
 def mock_logger_file_handler():
     """
-    מונע יצירת קבצים וגם דואג שה-Mock יתנהג כמו Handler תקין
-    כדי לא לשבור את הלוגים הפנימיים של asyncio.
+    Prevents creating files and ensures the mock behaves like a proper Handler.
     """
     with patch("logging.FileHandler") as MockHandler:
         # We define a 'level' field for the mocked Instance as a number (0)
